@@ -4,20 +4,76 @@ import dotenv from "dotenv";
 dotenv.config();
 
 interface Transaction {
+  payment_type?: string;
   transaction_details: {
     order_id: string;
     gross_amount: number;
   };
-  credit_card: {
+  credit_card?: {
     secure: boolean;
   };
-  customer_details: {
+  bank_transfer?: {
+    bank?: string;
+    account_number?: string;
+  };
+  customer_details?: {
     first_name: string;
     last_name: string;
     email: string;
     phone: string;
   };
 }
+
+export const createBankTransferTransaction = async (req: Request, res: Response) => {
+  const {
+    order_id,
+    gross_amount,
+    bank_code,
+    first_name,
+    last_name,
+    email,
+    phone,
+  } =req.body;
+  try {
+    const SERVER_KEY = process.env.MIDTRANS_SERVER_KEY as string;
+    const base64EncodedKey = Buffer.from(SERVER_KEY).toString('base64');
+    const bodyrequest: Transaction = {
+      payment_type: "bank_transfer",
+      transaction_details: {
+        order_id: order_id,
+        gross_amount: gross_amount,
+      },
+      bank_transfer: {
+        bank: bank_code,
+      },
+      customer_details: {
+        first_name: first_name,
+        last_name: last_name,
+        email: email,
+        phone: phone,
+      },
+    };
+    const transactionResponse = await axios.post(
+      "https://api.sandbox.midtrans.com/v2/charge",
+      bodyrequest,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${base64EncodedKey}`,
+        },
+      }
+    );
+    res.status(201).send({
+      data: transactionResponse.data,
+    });
+  } catch (error: any) {
+    res.status(500).send({
+      error: "failed to create bank tranfer transaction",
+      status: error.response?.status + " " + error.response?.statusText,
+      description: error.response?.data,
+    });
+  }
+};
 
 export const createSnapTransaction = async (req: Request, res: Response) => {
   const { order_id, gross_amount, first_name, last_name, email, phone } =
